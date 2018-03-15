@@ -1,6 +1,10 @@
 # python-36-gdal
 FROM centos/s2i-base-centos7
 
+# Inform users who's the maintainer of this builder image
+MAINTAINER Ashley Felton <ashley@ropable.com>
+
+# Specify the ports the final image will expose
 EXPOSE 8080
 
 ENV PYTHON_VERSION=3.6 \
@@ -22,6 +26,7 @@ LABEL summary="$SUMMARY" \
       io.k8s.display-name="Python 3.6 with GDAL" \
       io.openshift.expose-services="8080:http" \
       io.openshift.tags="builder,python,python36,rh-python36,gdal" \
+      io.openshift.s2i.scripts-url=image:///usr/local/s2i \
       com.redhat.component="rh-python36-docker" \
       name="rhscl/python-36-rhel7-gdal" \
       version="1"
@@ -46,10 +51,8 @@ RUN yum install -y yum-utils && \
 
 
 # Copy the S2I scripts from the specific language image to $STI_SCRIPTS_PATH.
-COPY ./s2i/bin/ $STI_SCRIPTS_PATH
-
-# Copy extra files to the image.
-#COPY ./root/ /
+#COPY ./s2i/bin/ $STI_SCRIPTS_PATH
+COPY ./s2i/bin/ /usr/local/s2i
 
 # - Create a Python virtual environment for use by any application to avoid
 #   potential conflicts with Python packages preinstalled in the main Python
@@ -59,7 +62,7 @@ COPY ./s2i/bin/ $STI_SCRIPTS_PATH
 #   under random UID.
 RUN source scl_source enable rh-python36 && \
     virtualenv ${APP_ROOT} && \
-    chown -R 1001:0 ${APP_ROOT} && \
+    chown -R 1001:1001 ${APP_ROOT} && \
     fix-permissions ${APP_ROOT} -P && \
     rpm-file-permissions
 
@@ -67,8 +70,4 @@ RUN source scl_source enable rh-python36 && \
 USER 1001
 
 # Set the default CMD for the image
-#CMD ["usage"]
-WORKDIR /app
-ADD . /app
-RUN pip install --trusted-host pypi.python.org -r requirements.txt
-CMD ["python", "app.py"]
+CMD ["usage"]

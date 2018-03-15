@@ -1,24 +1,33 @@
-from flask import Flask
-from redis import Redis, RedisError
 import os
-import socket
+import time
+from gunicorn.app.base import BaseApplication
+from gunicorn.six import iteritems
 
-# Connect to Redis
-redis = Redis(host="redis", db=0, socket_connect_timeout=2, socket_timeout=2)
 
-app = Flask(__name__)
+print('LOADING MODULE %s' % __file__)
 
-@app.route("/")
-def hello():
-    try:
-        visits = redis.incr("counter")
-    except RedisError:
-        visits = "<i>cannot connect to Redis, counter disabled</i>"
 
-    html = "<h3>Hello {name}!</h3>" \
-           "<b>Hostname:</b> {hostname}<br/>" \
-           "<b>Visits:</b> {visits}"
-    return html.format(name=os.getenv("LANG", "world"), hostname=socket.gethostname(), visits=visits)
+def wsgi_handler(environ, start_response):
+    print('HANDLE REQUEST %s' % time.time())
+    start_response('200 OK', [('Content-Type','text/html')])
+    return [b"Hello World from standalone WSGI application!"]
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+
+class StandaloneApplication(BaseApplication):
+    def __init__(self, app, options=None):
+        self.options = options or {}
+        self.application = app
+        super(StandaloneApplication, self).__init__()
+
+    def load_config(self):
+        config = dict([(key, value) for key, value in iteritems(self.options)
+                       if key in self.cfg.settings and value is not None])
+        for key, value in iteritems(config):
+            self.cfg.set(key.lower(), value)
+
+    def load(self):
+        return self.application
+
+
+if __name__ == '__main__':
+    StandaloneApplication(wsgi_handler, {'bind': ':8080'}).run()
